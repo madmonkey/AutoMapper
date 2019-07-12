@@ -1,125 +1,64 @@
-$framework = '4.0'
-
 properties {
 	$base_dir = resolve-path .
 	$build_dir = "$base_dir\build"
-	$dist_dir = "$base_dir\release"
 	$source_dir = "$base_dir\src"
-	$tools_dir = "$base_dir\tools"
-	$test_dir = "$build_dir\test"
 	$result_dir = "$build_dir\results"
-	$lib_dir = "$base_dir\lib"
-	$buildNumber = if ($env:build_number -ne $NULL) { $env:build_number } else { '2.0.9999.0' }
-	$config = "debug"
-	$framework_dir = Get-FrameworkDirectory
+	$global:config = "debug"
+	$tag = $(git tag -l --points-at HEAD)
+	$revision = @{ $true = "{0:00000}" -f [convert]::ToInt32("0" + $env:APPVEYOR_BUILD_NUMBER, 10); $false = "local" }[$env:APPVEYOR_BUILD_NUMBER -ne $NULL];
+	$suffix = @{ $true = ""; $false = "ci-$revision"}[$tag -ne $NULL -and $revision -ne "local"]
+	$commitHash = $(git rev-parse --short HEAD)
+	$buildSuffix = @{ $true = "$($suffix)-$($commitHash)"; $false = "$($branch)-$($commitHash)" }[$suffix -ne ""]
+    $versionSuffix = @{ $true = "--version-suffix=$($suffix)"; $false = ""}[$suffix -ne ""]
 }
 
 
 task default -depends local
 task local -depends compile, test
-task full -depends local, merge, dist
-task ci -depends clean, commonAssemblyInfo, local, merge, dist
+task ci -depends clean, release, local, pack, benchmark
 
 task clean {
-	delete_directory "$build_dir"
-	delete_directory "$dist_dir"
+	rd "$source_dir\artifacts" -recurse -force  -ErrorAction SilentlyContinue | out-null
+	rd "$base_dir\build" -recurse -force  -ErrorAction SilentlyContinue | out-null
 }
 
-task compile -depends clean { 
-    exec { msbuild /t:Clean /t:Build /p:Configuration=Automated$config /v:q /nologo $source_dir\AutoMapper.sln }
+task release {
+    $global:config = "release"
 }
 
-task commonAssemblyInfo {
-    $commit = git log -1 --pretty=format:%H
-    create-commonAssemblyInfo "$buildNumber" "$commit" "$source_dir\CommonAssemblyInfo.cs"
+task compile -depends clean {
+	echo "build: Tag is $tag"
+	echo "build: Package version suffix is $suffix"
+	echo "build: Build version suffix is $buildSuffix" 
+	
+	exec { dotnet --version }
+	exec { dotnet --info }
+
+    exec { dotnet build -c $config --version-suffix=$buildSuffix }
 }
 
-task merge {
-	create_directory "$build_dir\merge"
-	exec { & $tools_dir\ILMerge\ilmerge.exe /targetplatform:"v4,$framework_dir" /log /out:"$build_dir\merge\AutoMapper.dll" /internalize:AutoMapper.exclude "$build_dir\$config\AutoMapper\AutoMapper.dll" "$build_dir\$config\AutoMapper\Castle.Core.dll" "$build_dir\$config\AutoMapper\Castle.DynamicProxy2.dll" /keyfile:"$source_dir\AutoMapper.snk" }
+task pack -depends compile {
+	exec { dotnet pack $source_dir\AutoMapper\AutoMapper.csproj -c $config --no-build $versionSuffix }
+}
+
+task benchmark {
+    exec { & $source_dir\Benchmark\bin\$config\net461\Benchmark.exe }
 }
 
 task test {
-	create_directory "$build_dir\results"
-    exec { & $tools_dir\nunit\nunit-console-x86.exe $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll /nologo /nodots /xml=$result_dir\AutoMapper.xml }
-    exec { & $tools_dir\Machine.Specifications-net-4.0-Release\mspec.exe --teamcity $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll }
-}
+    Push-Location -Path $source_dir\UnitTests
 
-task dist {
-	create_directory $dist_dir
-	$exclude = @('*.pdb')
-	copy_files "$build_dir\merge" "$build_dir\dist-merged" $exclude
-	copy_files "$build_dir\$config\AutoMapper" "$build_dir\dist" $exclude
-	zip_directory "$build_dir\dist" "$dist_dir\AutoMapper-unmerged.zip"
-	copy-item "$build_dir\dist-merged\AutoMapper.dll" "$dist_dir"
-}
+    try {
+        exec { & dotnet test -c $config --no-build --no-restore }
+    } finally {
+        Pop-Location
+    }
 
-# -------------------------------------------------------------------------------------------------------------
-# generalized functions 
-# --------------------------------------------------------------------------------------------------------------
-function Get-FrameworkDirectory()
-{
-    $([System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory().Replace("v2.0.50727", "v4.0.30319"))
-}
+    Push-Location -Path $source_dir\IntegrationTests
 
-function global:zip_directory($directory, $file)
-{
-    delete_file $file
-    cd $directory
-    exec { & "$tools_dir\7-zip\7za.exe" a $file *.* }
-    cd $base_dir
-}
-
-function global:delete_directory($directory_name)
-{
-  rd $directory_name -recurse -force  -ErrorAction SilentlyContinue | out-null
-}
-
-function global:delete_file($file)
-{
-    if($file) {
-        remove-item $file  -force  -ErrorAction SilentlyContinue | out-null} 
-}
-
-function global:create_directory($directory_name)
-{
-  mkdir $directory_name  -ErrorAction SilentlyContinue  | out-null
-}
-
-function global:copy_files($source, $destination, $exclude = @()) {
-    create_directory $destination
-    Get-ChildItem $source -Recurse -Exclude $exclude | Copy-Item -Destination {Join-Path $destination $_.FullName.Substring($source.length)} 
-}
-
-function global:run_nunit ($test_assembly)
-{
-    exec { & $tools_dir\nunit\nunit-console-x86.exe $test_dir$test_assembly /nologo /nodots /xml=$result_dir$test_assembly.xml }
-}
-
-function global:create-commonAssemblyInfo($version, $commit, $filename)
-{
-	$date = Get-Date
-    "using System;
-using System.Reflection;
-using System.Runtime.InteropServices;
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by a tool.
-//     Runtime Version:2.0.50727.4927
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-[assembly: ComVisibleAttribute(false)]
-[assembly: AssemblyVersionAttribute(""$version"")]
-[assembly: AssemblyFileVersionAttribute(""$version"")]
-[assembly: AssemblyCopyrightAttribute(""Copyright Jimmy Bogard 2008-" + $date.Year + """)]
-[assembly: AssemblyProductAttribute(""AutoMapper"")]
-[assembly: AssemblyTrademarkAttribute(""$commit"")]
-[assembly: AssemblyCompanyAttribute("""")]
-[assembly: AssemblyConfigurationAttribute(""release"")]
-[assembly: AssemblyInformationalVersionAttribute(""$version"")]"  | out-file $filename -encoding "ASCII"    
+    try {
+        exec { & dotnet test -c $config --no-build --no-restore }
+    } finally {
+        Pop-Location
+    }
 }

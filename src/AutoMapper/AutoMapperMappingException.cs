@@ -1,14 +1,13 @@
 using System;
-using System.Runtime.Serialization;
+#if !DEBUG
+using System.Linq;
+#endif
 
 namespace AutoMapper
 {
-#if !SILVERLIGHT
-	[Serializable]
-#endif
     public class AutoMapperMappingException : Exception
     {
-        private string _message;
+        private readonly string _message;
 
         //
         // For guidelines regarding the creation of new exception types, see
@@ -22,76 +21,63 @@ namespace AutoMapper
         }
 
         public AutoMapperMappingException(string message)
-            : base(message)
-        {
-            _message = message;
-        }
+            : base(message) => _message = message;
 
-        public AutoMapperMappingException(string message, Exception inner)
-            : base(null, inner)
-        {
-            _message = message;
-        }
+        public AutoMapperMappingException(string message, Exception innerException)
+            : base(message, innerException) => _message = message;
 
-        public AutoMapperMappingException(ResolutionContext context)
-        {
-            Context = context;
-        }
+        public AutoMapperMappingException(string message, Exception innerException, TypePair types)
+            : this(message, innerException) => Types = types;
 
-        public AutoMapperMappingException(ResolutionContext context, Exception inner)
-            : base(null, inner)
-        {
-            Context = context;
-        }
+        public AutoMapperMappingException(string message, Exception innerException, TypePair types, TypeMap typeMap)
+            : this(message, innerException, types) => TypeMap = typeMap;
 
-#if !SILVERLIGHT
-		protected AutoMapperMappingException(
-			SerializationInfo info,
-			StreamingContext context) : base(info, context)
-		{
-		}
-#endif
+        public AutoMapperMappingException(string message, Exception innerException, TypePair types, TypeMap typeMap, IMemberMap memberMap)
+            : this(message, innerException, types, typeMap) => MemberMap = memberMap;
 
-        public AutoMapperMappingException(ResolutionContext context, string message)
-            : this(context)
-        {
-            _message = message;
-        }
-
-        public ResolutionContext Context { get; private set; }
+        public TypePair? Types { get; set; }
+        public TypeMap TypeMap { get; set; }
+        public IMemberMap MemberMap { get; set; }
 
         public override string Message
         {
             get
             {
-                string message = null;
-                if (Context != null)
+                var message = _message;
+                var newLine = Environment.NewLine;
+                if (Types?.SourceType != null && Types?.DestinationType != null)
                 {
-                    message = string.Format("Trying to map {0} to {1}.", Context.SourceType.FullName, Context.DestinationType.FullName);
-                    TypeMap contextTypeMap = Context.GetContextTypeMap();
-                    if (contextTypeMap != null)
-                    {
-                        message += string.Format("\nUsing mapping configuration for {0} to {1}", contextTypeMap.SourceType, contextTypeMap.DestinationType);
-                    }
-                    if (Context.TypeMap != null && Context.TypeMap != contextTypeMap)
-                    {
-                        message += string.Format("\nUsing property mapping configuration for {0} to {1}", Context.TypeMap.SourceType, Context.TypeMap.DestinationType);
-                    }
-                    if (Context.PropertyMap != null)
-                    {
-                        message += string.Format("\nDestination property: {0}", Context.PropertyMap.DestinationProperty.Name);
-                    }
+                    message = message + newLine + newLine + "Mapping types:";
+                    message += newLine + $"{Types?.SourceType.Name} -> {Types?.DestinationType.Name}";
+                    message += newLine + $"{Types?.SourceType.FullName} -> {Types?.DestinationType.FullName}";
                 }
-                if (_message != null)
+                if (TypeMap != null)
                 {
-                    message = (message == null ? null : message + "\n") + _message;
+                    message = message + newLine + newLine + "Type Map configuration:";
+                    message += newLine + $"{TypeMap.SourceType.Name} -> {TypeMap.DestinationType.Name}";
+                    message += newLine + $"{TypeMap.SourceType.FullName} -> {TypeMap.DestinationType.FullName}";
                 }
-                if (base.Message != null)
+                if (MemberMap != null)
                 {
-                    message = (message == null ? null : message + "\n") + base.Message;
+                    message = message + newLine + newLine + "Destination Member:";
+                    message += newLine + $"{MemberMap.DestinationName}" + newLine;
                 }
+
                 return message;
             }
         }
+
+#if !DEBUG
+        public override string StackTrace
+        {
+            get
+            {
+                return string.Join(Environment.NewLine,
+                    base.StackTrace
+                        .Split(new[] {Environment.NewLine}, StringSplitOptions.None)
+                        .Where(str => !str.TrimStart().StartsWith("at AutoMapper.")));
+            }
+        }
+#endif
     }
 }

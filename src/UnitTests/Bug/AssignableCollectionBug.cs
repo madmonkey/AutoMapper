@@ -1,86 +1,78 @@
 using System.Collections.Generic;
-using NUnit.Framework;
-using NBehave.Spec.NUnit;
+using Xunit;
+using Shouldly;
 
 namespace AutoMapper.UnitTests.Bug
 {
-	namespace AssignableCollectionBug
-	{
-		interface IAddress
-		{
-			string Street { get; set; }
-		}
+    namespace ByteArrayBug
+    {
+        public class When_mapping_byte_arrays : AutoMapperSpecBase
+        {
+            private Picture _source;
+            private PictureDto _dest;
 
-		interface IPerson
-		{
-			string Name { get; set; }
-			IList<IAddress> Addresses { get; set; }
-		}
+            public class Picture
+            {
+                public int Id { get; set; }
+                public string Description { get; set; }
+                public byte[] ImageData { get; set; }
+            }
 
-		// To keep things as simple as possible, implementations are exactly the same.
-		class PersonOne : IPerson
-		{
-			#region Implementation of IPerson
+            public class PictureDto
+            {
+                public string Description { get; set; }
+                public byte[] ImageData { get; set; }
+            }
 
-			public string Name { get; set; }
-			public IList<IAddress> Addresses { get; set; }
+            protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<Picture, PictureDto>();
+            });
 
-			#endregion
-		}
+            protected override void Because_of()
+            {
+                _source = new Picture {ImageData = new byte[100_000]};
+                _dest = Mapper.Map<Picture, PictureDto>(_source);
+            }
 
-		class PersonTwo : IPerson
-		{
-			public string Name { get; set; }
-			public IList<IAddress> Addresses { get; set; }
-		}
+            [Fact]
+            public void Should_copy_array()
+            {
+                _dest.ImageData.ShouldBe(_source.ImageData);
+            }
+        }
+    }
 
-		class AddressOne : IAddress
-		{
-			#region Implementation of IAddress
+    namespace AssignableLists
+    {
+        public class AutoMapperTests
+        {
+            [Fact]
+            public void ListShouldNotMapAsReference()
+            {
+                // arrange
 
-			public string Street { get; set; }
+                var config = new MapperConfiguration(cfg => cfg.CreateMap<A, B>());
+                var source = new A { Images = new List<string>() };
 
-			#endregion
-		}
+                // act
+                var destination = config.CreateMapper().Map<B>(source);
+                destination.Images.Add("test");
 
-		class AddressTwo : IAddress
-		{
-			#region Implementation of IAddress
+                // assert
+                destination.Images.Count.ShouldBe(1);
+                source.Images.Count.ShouldBe(0); // in 3.1.0 source.Images.Count is 1
+            }
+        }
 
-			public string Street { get; set; }
+        public class A
+        {
+            public IList<string> Images { get; set; }
+        }
 
-			#endregion
-		}
-
-		[TestFixture]
-		public class MappingTests
-		{
-			[Test]
-			public void CanMapPersonOneToPersonTwo()
-			{
-				IList<IAddress> adrList = new List<IAddress> { new AddressOne { Street = "Street One" } };
-				PersonOne source = new PersonOne { Name = "A Name", Addresses = adrList };
-
-				// I thought these mappings would be enough. I tried various others, without success.
-				Mapper.CreateMap<PersonOne, PersonTwo>();
-				Mapper.CreateMap<AddressOne, AddressTwo>();
-				Mapper.CreateMap<AddressOne, IAddress>().ConvertUsing(Mapper.Map<AddressOne, AddressTwo>);
-				Mapper.AssertConfigurationIsValid();
-				var result = Mapper.Map<PersonOne, PersonTwo>(source);
-
-				// These are ok.
-				Assert.AreEqual(source.Name, result.Name);
-				Assert.IsNotNull(result.Addresses);
-				Assert.IsTrue(result.Addresses.Count == 1);
-				Assert.AreEqual(source.Addresses[0].Street, result.Addresses[0].Street);
-
-				// This is what I can't get to pass:
-				result.Addresses[0].ShouldBeInstanceOf<AddressTwo>();
-
-				// Expected: instance of <AutomapperTest.AddressTwo>
-				// But was:  <AutomapperTest.AddressOne>
-			}
-		}
-
-	}
+        public class B
+        {
+            public IList<string> Images { get; set; }
+        }
+    }
 }

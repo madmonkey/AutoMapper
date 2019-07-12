@@ -1,11 +1,10 @@
-using NUnit.Framework;
-using NBehave.Spec.NUnit;
+using Xunit;
+using Shouldly;
 
 namespace AutoMapper.UnitTests.Bug
 {
     namespace AllowNullDestinationValuesBugs
     {
-        [TestFixture]
         public class When_mapping_to_an_assignable_object_with_nullable_off : AutoMapperSpecBase
         {
             private Destination _destination;
@@ -25,16 +24,13 @@ namespace AutoMapper.UnitTests.Bug
                 public string Name { get; set; }
             }
 
-            protected override void Establish_context()
+            protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(config =>
             {
-                Mapper.Initialize(config =>
-                {
-                    config.AllowNullDestinationValues = false;
-                    config.CreateMap<Inner, Inner>();
-                    config.CreateMap<Source, Destination>()
-                        .ForMember(dest => dest.SomeOtherProperty, opt => opt.MapFrom(src => src.Property));
-                });
-            }
+                config.AllowNullDestinationValues = false;
+                config.CreateMap<Inner, Inner>();
+                config.CreateMap<Source, Destination>()
+                    .ForMember(dest => dest.SomeOtherProperty, opt => opt.MapFrom(src => src.Property));
+            });
 
             protected override void Because_of()
             {
@@ -43,7 +39,7 @@ namespace AutoMapper.UnitTests.Bug
                 _destination = Mapper.Map<Source, Destination>(source);
             }
 
-            [Test]
+            [Fact]
             public void Should_create_the_assingable_member()
             {
                 _destination.ShouldNotBeNull();

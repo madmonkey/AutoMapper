@@ -1,9 +1,8 @@
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Shouldly;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
-    [TestFixture]
     public class MultipleInterfaceInheritance : AutoMapperSpecBase
     {
         private ThingDto _thingDto;
@@ -34,14 +33,11 @@ namespace AutoMapper.UnitTests.Bug
         {
         }
 
-        protected override void Establish_context()
+        protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
         {
-            Mapper.Initialize(cfg =>
-            {
-                cfg.CreateMap<Thing, ThingDto>();
-                cfg.CreateMap<IItem, ItemDto>();
-            });
-        }
+            cfg.CreateMap<Thing, ThingDto>();
+            cfg.CreateMap<IItem, ItemDto>();
+        });
 
         protected override void Because_of()
         {
@@ -49,10 +45,10 @@ namespace AutoMapper.UnitTests.Bug
             _thingDto = Mapper.Map<Thing, ThingDto>(thing);
         }
 
-        [Test]
+        [Fact]
         public void Should_map_successfully()
         {
-            _thingDto.Items.Length.ShouldEqual(1);
+            _thingDto.Items.Length.ShouldBe(1);
         }
     }
 }

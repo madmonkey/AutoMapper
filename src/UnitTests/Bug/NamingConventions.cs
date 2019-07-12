@@ -1,5 +1,5 @@
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Shouldly;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
@@ -21,7 +21,7 @@ namespace AutoMapper.UnitTests.Bug
         {
             public string cmok { get; set; }
 
-            public string mojeIme { get; set; }
+            public string MojeIme { get; set; }
 
             public string MojePrezime { get; set; }
 
@@ -33,22 +33,19 @@ namespace AutoMapper.UnitTests.Bug
             private Dario _dario;
             private Neda _neda;
 
-            protected override void Establish_context()
+            protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
             {
-                Mapper.Initialize(cfg =>
+                cfg.CreateProfile("MyMapperProfile", prf =>
                 {
-                    cfg.CreateProfile("MyMapperProfile", prf =>
-                    {
-                        prf.SourceMemberNamingConvention = new LowerUnderscoreNamingConvention();
-                        prf.CreateMap<Neda, Dario>();
-                    });                   
-                    cfg.CreateProfile("MyMapperProfile2", prf =>
-                    {
-                        prf.DestinationMemberNamingConvention = new LowerUnderscoreNamingConvention();
-                        prf.CreateMap<Dario, Neda>();
-                    });
+                    prf.SourceMemberNamingConvention = new LowerUnderscoreNamingConvention();
+                    prf.CreateMap<Neda, Dario>();
                 });
-            }
+                cfg.CreateProfile("MyMapperProfile2", prf =>
+                {
+                    prf.DestinationMemberNamingConvention = new LowerUnderscoreNamingConvention();
+                    prf.CreateMap<Dario, Neda>();
+                });
+            });
 
             protected override void Because_of()
             {
@@ -56,16 +53,16 @@ namespace AutoMapper.UnitTests.Bug
                 _neda = Mapper.Map<Dario, Neda>(_dario);
             }
 
-            [Test]
+            [Fact]
             public void Should_map_from_lower_to_pascal()
             {
-                _neda.ja_se_zovem_imenom.ShouldEqual("foo");
+                _neda.ja_se_zovem_imenom.ShouldBe("foo");
             }
 
-            [Test]
+            [Fact]
             public void Should_map_from_pascal_to_lower()
             {
-                _dario.JaSeZovemImenom.ShouldEqual("foo");
+                _dario.JaSeZovemImenom.ShouldBe("foo");
             }
         }
 

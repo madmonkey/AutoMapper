@@ -1,19 +1,17 @@
+﻿using System.Linq.Expressions;
+
 namespace AutoMapper.Mappers
 {
-	public class StringMapper : IObjectMapper
-	{
-		public object Map(ResolutionContext context, IMappingEngineRunner mapper)
-		{
-			if (context.SourceValue == null)
-			{
-				return mapper.FormatValue(context.CreateValueContext(null));
-			}
-			return mapper.FormatValue(context);
-		}
+    using static Expression;
 
-		public bool IsMatch(ResolutionContext context)
-		{
-			return context.DestinationType.Equals(typeof(string));
-		}
-	}
+    public class StringMapper : IObjectMapper
+    {
+        public bool IsMatch(TypePair context) => context.DestinationType == typeof(string) && context.SourceType != typeof(string);
+
+        public Expression MapExpression(IConfigurationProvider configurationProvider, ProfileMap profileMap,
+            IMemberMap memberMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
+        {
+            return Call(sourceExpression, typeof(object).GetDeclaredMethod("ToString"));
+        }
+    }
 }

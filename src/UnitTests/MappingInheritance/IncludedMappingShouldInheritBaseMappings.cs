@@ -1,16 +1,10 @@
-﻿using NUnit.Framework;
+﻿using Shouldly;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
-    [TestFixture]
-    public class IncludedMappingShouldInheritBaseMappings
+    public class IncludedBaseMappingShouldInheritBaseMappings : SpecBase
     {
-        [SetUp]
-        public void SetUp()
-        {
-            Mapper.Reset();
-        }
-
         public class ModelObject
         {
             public string DifferentBaseString { get; set; }
@@ -36,136 +30,269 @@ namespace AutoMapper.UnitTests.Bug
             public string SubString { get; set; }
         }
 
-        [Test]
+        [Fact]
         public void included_mapping_should_inherit_base_mappings_should_not_throw()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>();
+            var config = new MapperConfiguration(cfg =>
+            {
 
-            Mapper.AssertConfigurationIsValid();
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>();
+            });
+
+            config.AssertConfigurationIsValid();
+        }
+        [Fact]
+        public void included_mapping_should_not_care_about_order()
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>();
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+            });
+
+            config.AssertConfigurationIsValid();
         }
 
-        [Test]
+        [Fact]
         public void included_mapping_should_inherit_base_ignore_mappings_should_not_throw()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.Ignore())
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>();
-
-            Mapper.AssertConfigurationIsValid();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.Ignore())
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    ;
+            });
+            config.AssertConfigurationIsValid();
         }
 
-        [Test]
+        [Fact]
         public void more_specific_map_should_override_base_ignore_passes_validation()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.Ignore())
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>()
-                .ForMember(d=>d.BaseString, m=>m.MapFrom(s=>s.DifferentBaseString));
-
-            Mapper.AssertConfigurationIsValid();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.Ignore())
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+            });
+            config.AssertConfigurationIsValid();
         }
 
-        [Test]
-        public void more_specific_map_should_override_base_ignore()
+        [Fact]
+        public void more_specific_map_should_override_base_ignore_with_one_parameter()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.Ignore())
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString));
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.Ignore())
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+            });
 
-            var dto = Mapper.Map<ModelSubObject, DtoSubObject>(new ModelSubObject
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<DtoSubObject>(new ModelSubObject
             {
                 DifferentBaseString = "123",
                 SubString = "456"
             });
 
-            Assert.AreEqual("123", dto.BaseString);
-            Assert.AreEqual("456", dto.SubString);
+            "123".ShouldBe(dto.BaseString);
+            "456".ShouldBe(dto.SubString);
         }
 
-        [Test]
+        [Fact]
+        public void more_specific_map_should_override_base_ignore()
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.Ignore())
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+            });
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<ModelSubObject, DtoSubObject>(new ModelSubObject
+            {
+                DifferentBaseString = "123",
+                SubString = "456"
+            });
+
+            "123".ShouldBe(dto.BaseString);
+            "456".ShouldBe(dto.SubString);
+        }
+
+        [Fact]
         public void more_specific_map_should_override_base_mapping_passes_validation()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>()
-                .ForMember(d => d.BaseString, m => m.UseValue("789"));
-
-            Mapper.AssertConfigurationIsValid();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(src => "789"));
+            });
+            config.AssertConfigurationIsValid();
         }
-
-        [Test]
-        public void more_specific_map_should_override_base_mapping()
+        [Fact]
+        public void more_specific_map_should_override_base_mapping_with_one_parameter()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>()
-                .ForMember(d=>d.BaseString, m=>m.UseValue("789"));
-
-            var dto = Mapper.Map<ModelSubObject, DtoSubObject>(new ModelSubObject
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString));
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(src => "789"));
+            });
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<DtoSubObject>(new ModelSubObject
                                                                    {
                                                                        DifferentBaseString = "123",
                                                                        SubString = "456"
                                                                    });
 
-            Assert.AreEqual("789", dto.BaseString);
-            Assert.AreEqual("456", dto.SubString);
+            "789".ShouldBe(dto.BaseString);
+            "456".ShouldBe(dto.SubString);
+        }
+        
+        [Fact]
+        public void more_specific_map_should_override_base_mapping()
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
+                    ;
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(src => "789"));
+            });
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<ModelSubObject, DtoSubObject>(new ModelSubObject
+                                                                   {
+                                                                       DifferentBaseString = "123",
+                                                                       SubString = "456"
+                                                                   });
+
+            "789".ShouldBe(dto.BaseString);
+            "456".ShouldBe(dto.SubString);
         }
 
-        [Test]
-        public void included_mapping_should_not_inherit_base_mappings_for_other()
+        [Fact]
+        public void include_should_allow_automapper_to_select_more_specific_included_type_with_one_parameter()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString));
 
-            Mapper.CreateMap<ModelSubObject, OtherDto>();
-
-            var dto = Mapper.Map<ModelSubObject, OtherDto>(new ModelSubObject
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    ;
+            });
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<ModelObject, DtoObject>(new ModelSubObject
             {
                 DifferentBaseString = "123",
                 SubString = "456"
             });
 
-            Assert.AreEqual("456", dto.SubString);
+            dto.ShouldBeOfType<DtoSubObject>();
         }
-
-        [Test]
-        public void included_mapping_should_not_inherit_base_mappings_for_other_should_not_throw()
-        {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
-
-            Mapper.CreateMap<ModelSubObject, OtherDto>();
-
-            Mapper.AssertConfigurationIsValid();
-        }
-
-        [Test]
+        
+        [Fact]
         public void include_should_allow_automapper_to_select_more_specific_included_type()
         {
-            Mapper.CreateMap<ModelObject, DtoObject>()
-                .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString))
-                .Include<ModelSubObject, DtoSubObject>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m => m.MapFrom(s => s.DifferentBaseString));
 
-            Mapper.CreateMap<ModelSubObject, DtoSubObject>();
-
-            var dto = Mapper.Map<ModelObject, DtoObject>(new ModelSubObject
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>();
+            });
+            var mapper = config.CreateMapper();
+            var dto = mapper.Map<ModelObject, DtoObject>(new ModelSubObject
             {
                 DifferentBaseString = "123",
                 SubString = "456"
             });
 
-            Assert.IsInstanceOfType(typeof(DtoSubObject), dto);
+            dto.ShouldBeOfType<DtoSubObject>();
+        }
+
+        [Fact]
+        public void include_should_apply_condition()
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m =>
+                    {
+                        m.Condition(src => !string.IsNullOrWhiteSpace(src.DifferentBaseString));
+                        m.MapFrom(s => s.DifferentBaseString);
+                    })
+                    ;
+
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    ;
+            });
+            var dest = new DtoSubObject
+            {
+                BaseString = "12345"
+            };
+            var mapper = config.CreateMapper();
+            mapper.Map(new ModelSubObject
+            {
+                DifferentBaseString = "",
+            }, dest);
+
+            dest.BaseString.ShouldBe("12345");
+        }
+
+        [Fact]
+        public void include_should_apply_null_substitute()
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<ModelObject, DtoObject>()
+                    .ForMember(d => d.BaseString, m =>
+                    {
+                        m.MapFrom(s => s.DifferentBaseString);
+                        m.NullSubstitute("12345");
+                    })
+                    ;
+
+                cfg.CreateMap<ModelSubObject, DtoSubObject>()
+                    .IncludeBase<ModelObject, DtoObject>()
+                    ;
+            });
+            var mapper = config.CreateMapper();
+            var dest = mapper.Map<ModelSubObject, DtoSubObject>(new ModelSubObject());
+
+            dest.BaseString.ShouldBe("12345");
         }
     }
 }

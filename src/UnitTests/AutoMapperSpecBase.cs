@@ -1,23 +1,77 @@
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using System;
+using Xunit;
 
 namespace AutoMapper.UnitTests
 {
-    public class AutoMapperSpecBase : NonValidatingSpecBase
-	{
-        [Test]
+    using QueryableExtensions;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Linq.Expressions;
+
+    public abstract class AutoMapperSpecBase : NonValidatingSpecBase
+    {
+        [Fact]
         public void Should_have_valid_configuration()
         {
-            Mapper.AssertConfigurationIsValid();
+            Configuration.AssertConfigurationIsValid();
         }
+
     }
 
-    public class NonValidatingSpecBase : SpecBase
+    public abstract class NonValidatingSpecBase : SpecBase
     {
-        protected override void Cleanup()
+        private IMapper mapper;
+
+        protected abstract MapperConfiguration Configuration { get; }
+        protected IConfigurationProvider ConfigProvider => Configuration;
+
+        protected IMapper Mapper => mapper ?? (mapper = Configuration.CreateMapper());
+
+        protected IQueryable<TDestination> ProjectTo<TDestination>(IQueryable source, object parameters = null, params Expression<Func<TDestination, object>>[] membersToExpand) => 
+            Mapper.ProjectTo(source, parameters, membersToExpand);
+
+        protected IQueryable<TDestination> ProjectTo<TDestination>(IQueryable source, IDictionary<string, object> parameters, params string[] membersToExpand) =>
+            Mapper.ProjectTo<TDestination>(source, parameters, membersToExpand);
+    }
+
+    public abstract class SpecBaseBase
+    {
+        protected virtual void MainSetup()
         {
-            Mapper.Reset();
+            Establish_context();
+            Because_of();
         }
 
+        protected virtual void MainTeardown()
+        {
+            Cleanup();
+        }
+
+        protected virtual void Establish_context()
+        {
+        }
+
+        protected virtual void Because_of()
+        {
+        }
+
+        protected virtual void Cleanup()
+        {
+        }
     }
+    public abstract class SpecBase : SpecBaseBase, IDisposable
+    {
+        protected SpecBase()
+        {
+            Establish_context();
+            Because_of();
+        }
+
+        public void Dispose()
+        {
+            Cleanup();
+        }
+    }
+
 }
+

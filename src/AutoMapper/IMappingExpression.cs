@@ -3,86 +3,145 @@ using System.Linq.Expressions;
 
 namespace AutoMapper
 {
-    public interface IMappingExpression
+    /// <summary>
+    /// Mapping configuration options for non-generic maps
+    /// </summary>
+    public interface IMappingExpression : IMappingExpressionBase<object, object, IMappingExpression>
     {
-        void ConvertUsing<TTypeConverter>();
-        void ConvertUsing(Type typeConverterType);
-        IMappingExpression WithProfile(string profileName);
+        /// <summary>
+        /// Add extra configuration to the current map by also mapping the specified child objects to the destination object.
+        /// The maps from the child types to the destination need to be created explicitly.
+        /// </summary>
+        /// <param name="memberNames">the names of child object properties to map to the destination</param>
+        /// <returns></returns>
+        IMappingExpression IncludeMembers(params string[] memberNames);
+
+        /// <summary>
+        /// Create a type mapping from the destination to the source type, using the destination members as validation.
+        /// </summary>
+        /// <returns>Itself</returns>
+        IMappingExpression ReverseMap();
+
+        /// <summary>
+        /// Customize configuration for all members
+        /// </summary>
+        /// <param name="memberOptions">Callback for member options</param>
+        void ForAllMembers(Action<IMemberConfigurationExpression> memberOptions);
+
+        /// <summary>
+        /// Customize configuration for members not previously configured
+        /// </summary>
+        /// <param name="memberOptions">Callback for member options</param>
+        void ForAllOtherMembers(Action<IMemberConfigurationExpression> memberOptions);
+
+        /// <summary>
+        /// Customize individual members
+        /// </summary>
+        /// <param name="name">Name of the member</param>
+        /// <param name="memberOptions">Callback for configuring member</param>
+        /// <returns>Itself</returns>
         IMappingExpression ForMember(string name, Action<IMemberConfigurationExpression> memberOptions);
     }
 
-    public interface IMappingExpression<TSource, TDestination>
+    /// <summary>
+    /// Mapping configuration options
+    /// </summary>
+    /// <typeparam name="TSource">Source type</typeparam>
+    /// <typeparam name="TDestination">Destination type</typeparam>
+    public interface IMappingExpression<TSource, TDestination> : IMappingExpressionBase<TSource, TDestination, IMappingExpression<TSource, TDestination>>
     {
-        IMappingExpression<TSource, TDestination> ForMember(Expression<Func<TDestination, object>> destinationMember, Action<IMemberConfigurationExpression<TSource>> memberOptions);
-        IMappingExpression<TSource, TDestination> ForMember(string name, Action<IMemberConfigurationExpression<TSource>> memberOptions);
-        void ForAllMembers(Action<IMemberConfigurationExpression<TSource>> memberOptions);
+        /// <summary>
+        /// Add extra configuration to the current map by also mapping the specified child objects to the destination object.
+        /// The maps from the child types to the destination need to be created explicitly.
+        /// </summary>
+        /// <param name="memberExpressions">the child objects to map to the destination</param>
+        /// <returns></returns>
+        IMappingExpression<TSource, TDestination> IncludeMembers(params Expression<Func<TSource, object>>[] memberExpressions);
+
+        /// <summary>
+        /// Customize configuration for a path inside the destination object.
+        /// </summary>
+        /// <param name="destinationMember">Expression to the destination sub object</param>
+        /// <param name="memberOptions">Callback for member options</param>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> ForPath<TMember>(Expression<Func<TDestination, TMember>> destinationMember,
+            Action<IPathConfigurationExpression<TSource, TDestination, TMember>> memberOptions);
+
+        /// <summary>
+        /// Customize configuration for members not previously configured
+        /// </summary>
+        /// <param name="memberOptions">Callback for member options</param>
+        void ForAllOtherMembers(Action<IMemberConfigurationExpression<TSource, TDestination, object>> memberOptions);
+
+        /// <summary>
+        /// Customize configuration for individual member
+        /// </summary>
+        /// <param name="destinationMember">Expression to the top-level destination member. This must be a member on the <typeparamref name="TDestination"/>TDestination</param> type
+        /// <param name="memberOptions">Callback for member options</param>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> ForMember<TMember>(Expression<Func<TDestination, TMember>> destinationMember,
+            Action<IMemberConfigurationExpression<TSource, TDestination, TMember>> memberOptions);
+
+        /// <summary>
+        /// Customize configuration for individual member. Used when the name isn't known at compile-time
+        /// </summary>
+        /// <param name="name">Destination member name</param>
+        /// <param name="memberOptions">Callback for member options</param>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> ForMember(string name,
+            Action<IMemberConfigurationExpression<TSource, TDestination, object>> memberOptions);
+
+        /// <summary>
+        /// Customize configuration for all members
+        /// </summary>
+        /// <param name="memberOptions">Callback for member options</param>
+        void ForAllMembers(Action<IMemberConfigurationExpression<TSource, TDestination, object>> memberOptions);
+
+        /// <summary>
+        /// Include this configuration in derived types' maps
+        /// </summary>
+        /// <typeparam name="TOtherSource">Derived source type</typeparam>
+        /// <typeparam name="TOtherDestination">Derived destination type</typeparam>
+        /// <returns>Itself</returns>
         IMappingExpression<TSource, TDestination> Include<TOtherSource, TOtherDestination>()
             where TOtherSource : TSource
             where TOtherDestination : TDestination;
-        IMappingExpression<TSource, TDestination> WithProfile(string profileName);
-        void ConvertUsing(Func<TSource, TDestination> mappingFunction);
-        void ConvertUsing(ITypeConverter<TSource, TDestination> converter);
-        void ConvertUsing<TTypeConverter>() where TTypeConverter : ITypeConverter<TSource, TDestination>;
-        IMappingExpression<TSource, TDestination> BeforeMap(Action<TSource, TDestination> beforeFunction);
-        IMappingExpression<TSource, TDestination> BeforeMap<TMappingAction>() where TMappingAction : IMappingAction<TSource, TDestination>;
-        IMappingExpression<TSource, TDestination> AfterMap(Action<TSource, TDestination> afterFunction);
-        IMappingExpression<TSource, TDestination> AfterMap<TMappingAction>() where TMappingAction : IMappingAction<TSource, TDestination>;
-        IMappingExpression<TSource, TDestination> ConstructUsing(Func<TSource, TDestination> ctor);
-    }
 
-    public interface IMemberConfigurationExpression
-    {
-        void MapFrom(string sourceMember);
-        IResolutionExpression ResolveUsing(IValueResolver valueResolver);
-        IResolverConfigurationExpression ResolveUsing(Type valueResolverType);
-        IResolverConfigurationExpression ResolveUsing<TValueResolver>();
-    }
+        /// <summary>
+        /// Include the base type map's configuration in this map
+        /// </summary>
+        /// <typeparam name="TSourceBase">Base source type</typeparam>
+        /// <typeparam name="TDestinationBase">Base destination type</typeparam>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> IncludeBase<TSourceBase, TDestinationBase>();
 
-    public interface IMemberConfigurationExpression<TSource>
-    {
-        void SkipFormatter<TValueFormatter>() where TValueFormatter : IValueFormatter;
-        IFormatterCtorExpression<TValueFormatter> AddFormatter<TValueFormatter>() where TValueFormatter : IValueFormatter;
-        IFormatterCtorExpression AddFormatter(Type valueFormatterType);
-        void AddFormatter(IValueFormatter formatter);
-        void NullSubstitute(object nullSubstitute);
-        IResolverConfigurationExpression<TSource, TValueResolver> ResolveUsing<TValueResolver>() where TValueResolver : IValueResolver;
-        IResolverConfigurationExpression<TSource> ResolveUsing(Type valueResolverType);
-        IResolutionExpression<TSource> ResolveUsing(IValueResolver valueResolver);
-        void MapFrom<TMember>(Func<TSource, TMember> sourceMember);
-        void Ignore();
-        void SetMappingOrder(int mappingOrder);
-        void UseDestinationValue();
-        void UseValue<TValue>(TValue value);
-        void UseValue(object value);
-        void Condition(Func<TSource, bool> condition);
-        void Condition(Func<ResolutionContext, bool> condition);
-    }
+        /// <summary>
+        /// Override the destination type mapping for looking up configuration and instantiation
+        /// </summary>
+        /// <typeparam name="T">Destination type to use</typeparam>
+        void As<T>() where T : TDestination;
 
-    public interface IResolutionExpression
-    {
-        void FromMember(string sourcePropertyName);
-    }
-    
-    public interface IResolverConfigurationExpression : IResolutionExpression
-    {
-        IResolutionExpression ConstructedBy(Func<IValueResolver> constructor);
-    }
+        /// <summary>
+        /// Customize configuration for an individual source member
+        /// </summary>
+        /// <param name="sourceMember">Expression to source member. Must be a member of the <typeparamref name="TSource"/> type</param>
+        /// <param name="memberOptions">Callback for member configuration options</param>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> ForSourceMember(Expression<Func<TSource, object>> sourceMember,
+            Action<ISourceMemberConfigurationExpression> memberOptions);
 
-    public interface IResolutionExpression<TSource> : IResolutionExpression
-    {
-        void FromMember(Func<TSource, object> sourceMember);
-    }
+        /// <summary>
+        /// Apply a transformation function after any resolved destination member value with the given type
+        /// </summary>
+        /// <typeparam name="TValue">Value type to match and transform</typeparam>
+        /// <param name="transformer">Transformation expression</param>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> AddTransform<TValue>(Expression<Func<TValue, TValue>> transformer);
 
-    public interface IResolverConfigurationExpression<TSource, TValueResolver>
-        where TValueResolver : IValueResolver
-    {
-        IResolverConfigurationExpression<TSource, TValueResolver> FromMember(Func<TSource, object> sourceMember);
-        IResolverConfigurationExpression<TSource, TValueResolver> FromMember(string sourcePropertyName);
-        IResolverConfigurationExpression<TSource, TValueResolver> ConstructedBy(Func<TValueResolver> constructor);
-    }
-
-    public interface IResolverConfigurationExpression<TSource> : IResolutionExpression<TSource>
-    {
-        IResolutionExpression<TSource> ConstructedBy(Func<IValueResolver> constructor);
+        /// <summary>
+        /// Create a type mapping from the destination to the source type, using the <typeparamref name="TDestination"/> members as validation
+        /// </summary>
+        /// <returns>Itself</returns>
+        IMappingExpression<TDestination, TSource> ReverseMap();
     }
 }

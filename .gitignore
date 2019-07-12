@@ -1,5 +1,9 @@
 build/
 release/
+scripts/
+artifacts/
+.dotnet
+TestResults/
 *.suo
 *.user
 bin
@@ -11,3 +15,20 @@ _ReSharper*
 *.suo
 *.cache
 TestResult.xml
+AppPackages/
+*.bak
+packages
+*.orig
+*.DotSettings
+*.ide/
+.nuget
+project.lock.json
+.vs
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Read the Docs
+docs/_build
+/src/LastMajorVersionBinary
